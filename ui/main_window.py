@@ -4,8 +4,6 @@ from ui.tabs.threats_tab import ThreatsTab
 from ui.tabs.geo_tab import GeoTab
 from ui.tabs.reputation_tab import ReputationTab
 from ui.tabs.settings_tab import SettingsTab
-from ui.tabs.sniffer.sniffer_tab import SnifferTab
-
 
 def run_gui():
     app = QApplication([])
@@ -23,7 +21,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         self.tabs.addTab(LanTab(), "LAN")
-        self.tabs.addTab(SnifferTab(), "Sniffer")
         self.tabs.addTab(ThreatsTab(), "Threats")
         self.tabs.addTab(GeoTab(), "Geolocation")
         self.tabs.addTab(ReputationTab(), "Reputation")
