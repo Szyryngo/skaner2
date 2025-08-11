@@ -1,27 +1,28 @@
+from PyQt5.QtCore import QObject, pyqtSignal
 from scapy.all import sniff
-from core.ai import ThreatDetector
-from PyQt5.QtCore import pyqtSignal, QObject
+from threading import Thread
 
-class PacketSignal(QObject):
-    packet_received = pyqtSignal(object, str)
+class Sniffer(QObject):
+    packet_received = pyqtSignal(object)
 
-class Sniffer:
-    def __init__(self, interface):
-        self.interface = interface
+    def __init__(self, iface):
+        super().__init__()
+        self.iface = iface
         self.running = False
-        self.detector = ThreatDetector()
-        self.signal = PacketSignal()
+        self.thread = None
 
     def start(self):
-        self.running = True
-        sniff(iface=self.interface, prn=self.process_packet, store=False, stop_filter=self.should_stop)
+        if not self.running:
+            self.running = True
+            self.thread = Thread(target=self._sniff)
+            self.thread.start()
 
     def stop(self):
         self.running = False
 
-    def should_stop(self, packet):
-        return not self.running
+    def _sniff(self):
+        sniff(iface=self.iface, prn=self._handle_packet, store=False)
 
-    def process_packet(self, packet):
-        classification = self.detector.classify(packet)
-        self.signal.packet_received.emit(packet, classification)
+    def _handle_packet(self, packet):
+        if self.running:
+            self.packet_received.emit(packet)
