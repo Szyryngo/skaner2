@@ -5,9 +5,9 @@ from PyQt5.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt
-from network_guard.core.sniffer import Sniffer
-from network_guard.core.ai import ThreatDetector
 from scapy.all import get_if_list
+from core.sniffer import Sniffer
+from core.ai import ThreatDetector
 
 class PacketSnifferGUI(QWidget):
     def __init__(self):
@@ -53,14 +53,12 @@ class PacketSnifferGUI(QWidget):
         scapy_names = get_if_list()
 
         for scapy_name in scapy_names:
-            # Spróbuj dopasować do czytelnej nazwy
             for friendly_name in readable:
                 if friendly_name in scapy_name or scapy_name in friendly_name:
                     self.interface_map[friendly_name] = scapy_name
                     self.interface_box.addItem(friendly_name)
                     break
             else:
-                # Jeśli nie znaleziono dopasowania
                 self.interface_map[scapy_name] = scapy_name
                 self.interface_box.addItem(scapy_name)
 
