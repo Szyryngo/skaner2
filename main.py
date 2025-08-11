@@ -6,7 +6,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from scapy.all import get_if_list
-from sniffer import Sniffer
+from core.sniffer import Sniffer
+from core.ai import ThreatDetector
 
 class PacketSnifferGUI(QWidget):
     def __init__(self):
@@ -14,6 +15,7 @@ class PacketSnifferGUI(QWidget):
         self.setWindowTitle("Skaner2 - Network Sniffer")
         self.setGeometry(100, 100, 800, 600)
 
+        self.detector = ThreatDetector()
         self.sniffer = None
         self.interface_map = {}
 
@@ -36,7 +38,7 @@ class PacketSnifferGUI(QWidget):
 
         self.packet_table = QTableWidget()
         self.packet_table.setColumnCount(4)
-        self.packet_table.setHorizontalHeaderLabels(["Time", "Source", "Destination", "Protocol"])
+        self.packet_table.setHorizontalHeaderLabels(["Time", "Source", "Destination", "Classification"])
         layout.addWidget(self.packet_table)
 
         self.packet_view = QTextEdit()
@@ -74,25 +76,31 @@ class PacketSnifferGUI(QWidget):
             self.sniffer.stop()
 
     def handle_packet(self, packet):
+        classification = self.detector.classify(packet)
+
         row = self.packet_table.rowCount()
         self.packet_table.insertRow(row)
 
         time_item = QTableWidgetItem(str(packet.time))
         src_item = QTableWidgetItem(packet.src if hasattr(packet, "src") else "N/A")
         dst_item = QTableWidgetItem(packet.dst if hasattr(packet, "dst") else "N/A")
-        proto_item = QTableWidgetItem(packet.summary())
+        class_item = QTableWidgetItem(classification)
 
-        for item in [time_item, src_item, dst_item, proto_item]:
-            item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        color = self.detector.get_color(classification)
+        for item in [time_item, src_item, dst_item, class_item]:
+            item.setBackground(Qt.GlobalColor.__dict__.get(color.capitalize(), Qt.white))
 
         self.packet_table.setItem(row, 0, time_item)
         self.packet_table.setItem(row, 1, src_item)
         self.packet_table.setItem(row, 2, dst_item)
-        self.packet_table.setItem(row, 3, proto_item)
+        self.packet_table.setItem(row, 3, class_item)
 
         hex_data = bytes(packet).hex()
         ascii_data = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in bytes(packet))
         self.packet_view.setPlainText(f"HEX:\n{hex_data}\n\nASCII:\n{ascii_data}")
+
+        if self.detector.should_alert(classification):
+            QMessageBox.warning(self, "Zagrożenie wykryte", f"Wykryto: {classification}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
