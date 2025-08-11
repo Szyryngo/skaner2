@@ -12,7 +12,7 @@ from core.ai import ThreatDetector
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Skaner2 - Network Sniffer")
+        self.setWindowTitle("Network Guard")
         self.setGeometry(100, 100, 800, 600)
 
         self.detector = ThreatDetector()
@@ -69,7 +69,7 @@ class MainWindow(QWidget):
         iface = self.interface_map.get(selected_label)
         if iface:
             self.sniffer = Sniffer(iface)
-            self.sniffer.set_callback(self.handle_packet)
+            self.sniffer.packet_received.connect(self.handle_packet)
             self.sniffer.start()
 
     def stop_sniffing(self):
@@ -102,9 +102,3 @@ class MainWindow(QWidget):
 
         if self.detector.should_alert(classification):
             QMessageBox.warning(self, "Zagrożenie wykryte", f"Wykryto: {classification}")
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
