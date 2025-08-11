@@ -1,108 +1,73 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QComboBox,
-    QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox, QLabel,
-    QHBoxLayout, QCheckBox
+    QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt
-from scapy.all import get_if_list
-from core.sniffer import Sniffer
-from core.ai import ThreatDetector
-from core.storage import PacketStorage
-from core.stats import ThreatStats
+from scapy.all import get_windows_if_list
+from network_guard.core.sniffer import Sniffer
+from network_guard.core.ai import ThreatDetector
 
 class PacketSnifferGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI Packet Sniffer v2")
-        self.setGeometry(100, 100, 900, 700)
+        self.setWindowTitle("Network Guard")
+        self.setGeometry(100, 100, 800, 600)
 
         self.detector = ThreatDetector()
-        self.storage = PacketStorage()
-        self.stats = ThreatStats()
         self.sniffer = None
-        self.filters = set()
+        self.interface_map = {}
 
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout()
 
-        # Interfejs + przyciski
-        top_layout = QHBoxLayout()
         self.interface_box = QComboBox()
-        self.interface_box.addItems(get_if_list())
-        top_layout.addWidget(self.interface_box)
+        self.load_interfaces()
+        layout.addWidget(self.interface_box)
 
-        self.start_button = QPushButton("Start")
+        self.start_button = QPushButton("Start Sniffing")
         self.start_button.clicked.connect(self.start_sniffing)
-        top_layout.addWidget(self.start_button)
+        layout.addWidget(self.start_button)
 
-        self.stop_button = QPushButton("Stop")
+        self.stop_button = QPushButton("Stop Sniffing")
         self.stop_button.clicked.connect(self.stop_sniffing)
-        top_layout.addWidget(self.stop_button)
+        layout.addWidget(self.stop_button)
 
-        self.save_button = QPushButton("Zapisz PCAP")
-        self.save_button.clicked.connect(self.save_pcap)
-        top_layout.addWidget(self.save_button)
-
-        layout.addLayout(top_layout)
-
-        # Filtrowanie
-        filter_layout = QHBoxLayout()
-        for label in ["normal", "scan", "malware", "flood"]:
-            cb = QCheckBox(label)
-            cb.stateChanged.connect(self.update_filters)
-            filter_layout.addWidget(cb)
-        layout.addLayout(filter_layout)
-
-        # Statystyki
-        self.stats_label = QLabel("Statystyki: brak")
-        layout.addWidget(self.stats_label)
-
-        # Tabela pakietów
         self.packet_table = QTableWidget()
         self.packet_table.setColumnCount(4)
         self.packet_table.setHorizontalHeaderLabels(["Time", "Source", "Destination", "Classification"])
         self.packet_table.cellClicked.connect(self.show_packet_details)
         layout.addWidget(self.packet_table)
 
-        # Podgląd pakietu
         self.packet_view = QTextEdit()
         self.packet_view.setReadOnly(True)
         layout.addWidget(self.packet_view)
 
         self.setLayout(layout)
 
+    def load_interfaces(self):
+        interfaces = get_windows_if_list()
+        for iface in interfaces:
+            npf_name = iface['name']
+            user_name = iface['description']
+            self.interface_map[user_name] = npf_name
+            self.interface_box.addItem(user_name)
+
     def start_sniffing(self):
-        interface = self.interface_box.currentText()
-        self.sniffer = Sniffer(interface)
-        self.sniffer.signal.packet_received.connect(self.handle_packet)
-        self.sniffer.start()
+        user_selected = self.interface_box.currentText()
+        npf_name = self.interface_map.get(user_selected)
+        if npf_name:
+            self.sniffer = Sniffer(npf_name)
+            self.sniffer.signal.packet_received.connect(self.handle_packet)
+            self.sniffer.start()
 
     def stop_sniffing(self):
         if self.sniffer:
             self.sniffer.stop()
 
-    def save_pcap(self):
-        self.storage.save()
-        QMessageBox.information(self, "Zapisano", "Pakiety zapisane do capture.pcap")
-
-    def update_filters(self):
-        self.filters.clear()
-        for i in range(4):
-            cb = self.layout().itemAt(1).layout().itemAt(i).widget()
-            if cb.isChecked():
-                self.filters.add(cb.text())
-
     def handle_packet(self, packet, classification):
-        self.storage.add(packet)
-        self.stats.update(classification)
-        self.update_stats_label()
-
-        if self.filters and classification not in self.filters:
-            return
-
         row = self.packet_table.rowCount()
         self.packet_table.insertRow(row)
 
@@ -123,13 +88,8 @@ class PacketSnifferGUI(QWidget):
         if self.detector.should_alert(classification):
             QMessageBox.warning(self, "Zagrożenie wykryte", f"Wykryto: {classification}")
 
-    def update_stats_label(self):
-        stats = self.stats.get_stats()
-        text = "Statystyki: " + ", ".join(f"{k}: {v}" for k, v in stats.items())
-        self.stats_label.setText(text)
-
     def show_packet_details(self, row, column):
-        packet = self.storage.packets[row]
+        packet = self.sniffer.signal.packet_received.receivers()[0][0].__self__.last_packet
         hex_data = bytes(packet).hex()
         ascii_data = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in bytes(packet))
         self.packet_view.setPlainText(f"HEX:\n{hex_data}\n\nASCII:\n{ascii_data}")
