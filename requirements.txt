@@ -1,6 +1,4 @@
 scapy
 PyQt5
-requests
-folium
 joblib
-scikit-learn
+sklearn
