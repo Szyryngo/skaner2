@@ -9,7 +9,7 @@ from scapy.all import get_if_list
 from core.sniffer import Sniffer
 from core.ai import ThreatDetector
 
-class PacketSnifferGUI(QWidget):
+class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Skaner2 - Network Sniffer")
@@ -28,11 +28,11 @@ class PacketSnifferGUI(QWidget):
         self.load_interfaces()
         layout.addWidget(self.interface_box)
 
-        self.start_button = QPushButton("Start Sniffing")
+        self.start_button = QPushButton("Start")
         self.start_button.clicked.connect(self.start_sniffing)
         layout.addWidget(self.start_button)
 
-        self.stop_button = QPushButton("Stop Sniffing")
+        self.stop_button = QPushButton("Stop")
         self.stop_button.clicked.connect(self.stop_sniffing)
         layout.addWidget(self.stop_button)
 
@@ -65,10 +65,11 @@ class PacketSnifferGUI(QWidget):
             self.interface_box.addItem(label)
 
     def start_sniffing(self):
-        user_selected = self.interface_box.currentText()
-        iface_name = self.interface_map.get(user_selected)
-        if iface_name:
-            self.sniffer = Sniffer(iface_name, self.handle_packet)
+        selected_label = self.interface_box.currentText()
+        iface = self.interface_map.get(selected_label)
+        if iface:
+            self.sniffer = Sniffer(iface)
+            self.sniffer.packet_received.connect(self.handle_packet)
             self.sniffer.start()
 
     def stop_sniffing(self):
@@ -82,8 +83,8 @@ class PacketSnifferGUI(QWidget):
         self.packet_table.insertRow(row)
 
         time_item = QTableWidgetItem(str(packet.time))
-        src_item = QTableWidgetItem(packet.src if hasattr(packet, "src") else "N/A")
-        dst_item = QTableWidgetItem(packet.dst if hasattr(packet, "dst") else "N/A")
+        src_item = QTableWidgetItem(getattr(packet, "src", "N/A"))
+        dst_item = QTableWidgetItem(getattr(packet, "dst", "N/A"))
         class_item = QTableWidgetItem(classification)
 
         color = self.detector.get_color(classification)
@@ -104,6 +105,6 @@ class PacketSnifferGUI(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = PacketSnifferGUI()
+    window = MainWindow()
     window.show()
     sys.exit(app.exec_())
