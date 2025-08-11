@@ -1,5 +1,5 @@
 import sys
-import psutil
+import wmi
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox
@@ -49,18 +49,24 @@ class PacketSnifferGUI(QWidget):
         self.setLayout(layout)
 
     def load_interfaces(self):
-        readable = psutil.net_if_addrs()
-        scapy_names = get_if_list()
+        # Pobierz listę interfejsów z Scapy
+        scapy_ifaces = get_if_list()
 
-        for scapy_name in scapy_names:
-            for friendly_name in readable:
-                if friendly_name in scapy_name or scapy_name in friendly_name:
-                    self.interface_map[friendly_name] = scapy_name
-                    self.interface_box.addItem(friendly_name)
-                    break
-            else:
-                self.interface_map[scapy_name] = scapy_name
-                self.interface_box.addItem(scapy_name)
+        # Pobierz czytelne nazwy z WMI
+        w = wmi.WMI()
+        guid_map = {}
+        for nic in w.Win32_NetworkAdapter():
+            guid = nic.GUID
+            name = nic.NetConnectionID or nic.Name
+            if guid and name:
+                npf_name = f"NPF_{{{guid}}}"
+                guid_map[npf_name] = name
+
+        # Powiąż i dodaj do GUI
+        for iface in scapy_ifaces:
+            label = guid_map.get(iface, iface)
+            self.interface_map[label] = iface
+            self.interface_box.addItem(label)
 
     def start_sniffing(self):
         user_selected = self.interface_box.currentText()
