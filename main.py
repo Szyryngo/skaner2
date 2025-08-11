@@ -102,3 +102,9 @@ class MainWindow(QWidget):
 
         if self.detector.should_alert(classification):
             QMessageBox.warning(self, "Zagrożenie wykryte", f"Wykryto: {classification}")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
