@@ -1,12 +1,13 @@
 import sys
+import psutil
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox
 )
 from PyQt5.QtCore import Qt
-from scapy.all import get_windows_if_list
 from network_guard.core.sniffer import Sniffer
 from network_guard.core.ai import ThreatDetector
+from scapy.all import get_if_list
 
 class PacketSnifferGUI(QWidget):
     def __init__(self):
@@ -48,18 +49,26 @@ class PacketSnifferGUI(QWidget):
         self.setLayout(layout)
 
     def load_interfaces(self):
-        interfaces = get_windows_if_list()
-        for iface in interfaces:
-            npf_name = iface['name']
-            user_name = iface['description']
-            self.interface_map[user_name] = npf_name
-            self.interface_box.addItem(user_name)
+        readable = psutil.net_if_addrs()
+        scapy_names = get_if_list()
+
+        for scapy_name in scapy_names:
+            # Spróbuj dopasować do czytelnej nazwy
+            for friendly_name in readable:
+                if friendly_name in scapy_name or scapy_name in friendly_name:
+                    self.interface_map[friendly_name] = scapy_name
+                    self.interface_box.addItem(friendly_name)
+                    break
+            else:
+                # Jeśli nie znaleziono dopasowania
+                self.interface_map[scapy_name] = scapy_name
+                self.interface_box.addItem(scapy_name)
 
     def start_sniffing(self):
         user_selected = self.interface_box.currentText()
-        npf_name = self.interface_map.get(user_selected)
-        if npf_name:
-            self.sniffer = Sniffer(npf_name)
+        iface_name = self.interface_map.get(user_selected)
+        if iface_name:
+            self.sniffer = Sniffer(iface_name)
             self.sniffer.signal.packet_received.connect(self.handle_packet)
             self.sniffer.start()
 
