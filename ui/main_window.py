@@ -6,6 +6,7 @@ from ui.tabs.reputation_tab import ReputationTab
 from ui.tabs.settings_tab import SettingsTab
 from ui.tabs.sniffer.sniffer_tab import SnifferTab
 
+
 def run_gui():
     app = QApplication([])
     window = MainWindow()
