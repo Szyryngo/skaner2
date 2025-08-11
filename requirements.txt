@@ -2,3 +2,4 @@ scapy
 PyQt5
 joblib
 sklearn
+matplotlib
