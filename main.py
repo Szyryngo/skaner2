@@ -6,16 +6,14 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from scapy.all import get_if_list
-from core.sniffer import Sniffer
-from core.ai import ThreatDetector
+from sniffer import Sniffer
 
 class PacketSnifferGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Network Guard")
+        self.setWindowTitle("Skaner2 - Network Sniffer")
         self.setGeometry(100, 100, 800, 600)
 
-        self.detector = ThreatDetector()
         self.sniffer = None
         self.interface_map = {}
 
@@ -38,8 +36,7 @@ class PacketSnifferGUI(QWidget):
 
         self.packet_table = QTableWidget()
         self.packet_table.setColumnCount(4)
-        self.packet_table.setHorizontalHeaderLabels(["Time", "Source", "Destination", "Classification"])
-        self.packet_table.cellClicked.connect(self.show_packet_details)
+        self.packet_table.setHorizontalHeaderLabels(["Time", "Source", "Destination", "Protocol"])
         layout.addWidget(self.packet_table)
 
         self.packet_view = QTextEdit()
@@ -49,12 +46,10 @@ class PacketSnifferGUI(QWidget):
         self.setLayout(layout)
 
     def load_interfaces(self):
-        # Pobierz listę interfejsów z Scapy
         scapy_ifaces = get_if_list()
-
-        # Pobierz czytelne nazwy z WMI
         w = wmi.WMI()
         guid_map = {}
+
         for nic in w.Win32_NetworkAdapter():
             guid = nic.GUID
             name = nic.NetConnectionID or nic.Name
@@ -62,7 +57,6 @@ class PacketSnifferGUI(QWidget):
                 npf_name = f"NPF_{{{guid}}}"
                 guid_map[npf_name] = name
 
-        # Powiąż i dodaj do GUI
         for iface in scapy_ifaces:
             label = guid_map.get(iface, iface)
             self.interface_map[label] = iface
@@ -72,37 +66,30 @@ class PacketSnifferGUI(QWidget):
         user_selected = self.interface_box.currentText()
         iface_name = self.interface_map.get(user_selected)
         if iface_name:
-            self.sniffer = Sniffer(iface_name)
-            self.sniffer.signal.packet_received.connect(self.handle_packet)
+            self.sniffer = Sniffer(iface_name, self.handle_packet)
             self.sniffer.start()
 
     def stop_sniffing(self):
         if self.sniffer:
             self.sniffer.stop()
 
-    def handle_packet(self, packet, classification):
+    def handle_packet(self, packet):
         row = self.packet_table.rowCount()
         self.packet_table.insertRow(row)
 
         time_item = QTableWidgetItem(str(packet.time))
         src_item = QTableWidgetItem(packet.src if hasattr(packet, "src") else "N/A")
         dst_item = QTableWidgetItem(packet.dst if hasattr(packet, "dst") else "N/A")
-        class_item = QTableWidgetItem(classification)
+        proto_item = QTableWidgetItem(packet.summary())
 
-        color = self.detector.get_color(classification)
-        for item in [time_item, src_item, dst_item, class_item]:
-            item.setBackground(Qt.GlobalColor.__dict__.get(color.capitalize(), Qt.white))
+        for item in [time_item, src_item, dst_item, proto_item]:
+            item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
 
         self.packet_table.setItem(row, 0, time_item)
         self.packet_table.setItem(row, 1, src_item)
         self.packet_table.setItem(row, 2, dst_item)
-        self.packet_table.setItem(row, 3, class_item)
+        self.packet_table.setItem(row, 3, proto_item)
 
-        if self.detector.should_alert(classification):
-            QMessageBox.warning(self, "Zagrożenie wykryte", f"Wykryto: {classification}")
-
-    def show_packet_details(self, row, column):
-        packet = self.sniffer.signal.packet_received.receivers()[0][0].__self__.last_packet
         hex_data = bytes(packet).hex()
         ascii_data = ''.join(chr(b) if 32 <= b <= 126 else '.' for b in bytes(packet))
         self.packet_view.setPlainText(f"HEX:\n{hex_data}\n\nASCII:\n{ascii_data}")
