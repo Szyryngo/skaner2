@@ -69,7 +69,7 @@ class MainWindow(QWidget):
         iface = self.interface_map.get(selected_label)
         if iface:
             self.sniffer = Sniffer(iface)
-            self.sniffer.packet_received.connect(self.handle_packet)
+            self.sniffer.set_callback(self.handle_packet)
             self.sniffer.start()
 
     def stop_sniffing(self):
