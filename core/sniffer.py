@@ -1,27 +1,27 @@
-from scapy.all import sniff, wrpcap
-from datetime import datetime
+from scapy.all import sniff
+from core.ai import ThreatDetector
+from PyQt5.QtCore import pyqtSignal, QObject
 
-class PacketSniffer:
-    def __init__(self, iface):
-        self.iface = iface
-        self.packets = []
-        self.index = 0
+class PacketSignal(QObject):
+    packet_received = pyqtSignal(object, str)
+
+class Sniffer:
+    def __init__(self, interface):
+        self.interface = interface
         self.running = False
+        self.detector = ThreatDetector()
+        self.signal = PacketSignal()
 
-    def start(self, callback):
+    def start(self):
         self.running = True
-        sniff(iface=self.iface, prn=lambda pkt: self._handle(pkt, callback), store=False)
-
-    def _handle(self, packet, callback):
-        self.index += 1
-        self.packets.insert(0, (self.index, packet))  # najnowszy na górze
-        callback(self.index, packet)
+        sniff(iface=self.interface, prn=self.process_packet, store=False, stop_filter=self.should_stop)
 
     def stop(self):
         self.running = False
 
-    def save_to_pcap(self, filename=None):
-        if not filename:
-            filename = f"capture_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
-        wrpcap(filename, [pkt for _, pkt in self.packets])
-        return filename
+    def should_stop(self, packet):
+        return not self.running
+
+    def process_packet(self, packet):
+        classification = self.detector.classify(packet)
+        self.signal.packet_received.emit(packet, classification)
